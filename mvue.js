@@ -1,6 +1,5 @@
 class Mvue {
     constructor(options) {
-        console.log(options);
         this.$options = options;
         this._data = options.data;
         // 劫持数据
@@ -27,8 +26,10 @@ class Mvue {
                 },
                 set(newValue) {
                     console.log('set', newValue);
-                    value = newValue;
-                    dap.notify(newValue);
+                    if (value !== newValue) {
+                        value = newValue;
+                        dap.notify(newValue);
+                    }
                 },
             })
         });
@@ -43,7 +44,7 @@ class Mvue {
         // console.log(childNodes);
         Array.from(childNodes).forEach(item => {
             let { nodeType } = item;
-            
+
             // 文本
             if (nodeType === 3) {
                 let reg = /\{\{\s*(\S*)\s*\}\}/; // 匹配文本中的变量 例：{{message}}
@@ -63,24 +64,27 @@ class Mvue {
                 const attrs = item.attributes; // 取标签的所有属性
                 // 因为是类数组，所以需要转化
 
-                Array.from(attrs).forEach(attr=> {
+                Array.from(attrs).forEach(attr => {
                     let attrName = attr.name;
                     let attrValue = attr.value;
-                    if(attrName.indexOf('k-') === 0 ) {
+                    // 判断是否是自定义属性
+                    if (attrName.includes('k-')) {
                         attrName = attrName.substr(2);
                         // 给显示的文本赋值  这块可以添加其他自定义属性
-                        if(attrName === 'modal') {
+                        if (attrName === 'modal') {
                             item.value = this._data[attrValue];
+                            // 删除自定义属性，不展示在元素节点中
+                            item.removeAttribute(attr.name);
                         }
                     }
                     // 监听输入，通过view 修改 modal层。
-                    item.addEventListener('input',e => {
+                    item.addEventListener('input', e => {
                         this._data[attrValue] = e.target.value;
                     })
                     // 监听modal的数据改变，显示到view
                     new Watcher(this, attrValue, newValue => {
                         item.value = newValue;
-                      });
+                    });
                 })
                 console.log(item.attributes);
 
@@ -114,6 +118,7 @@ class Dap {
 class Watcher {
     constructor(view, vm, callBack) {
         Dap.target = this;
+        // 触发属性的get方法，将当前watcher添加到 待通知对象中
         view._data[vm];
         this.callBack = callBack;
         Dap.target = null;
