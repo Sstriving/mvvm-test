@@ -6,27 +6,33 @@ class Mvue {
         // 劫持数据
         this.observer(this._data);
 
+        // 查找节点，做数据替换&&绑定。
         this.compile(options.el);
     }
-    // 劫持
+    // 数据劫持，替换默认的get / set方法
     observer(data) {
         const keys = Object.keys(data);
         console.log(keys);
         keys.forEach(key => {
             let value = data[key];
+            let dap = new Dap();
+
             Object.defineProperty(data, key, {
                 enumerable: true,
                 configurable: true,
-                set(newValue) {
-                    console.log('set',newValue);
-                    value = newValue;
-                },
                 get() {
+                    if (Dap.target) {
+                        dap.addSub(Dap.target);
+                    }
                     return value;
-                }
+                },
+                set(newValue) {
+                    console.log('set', newValue);
+                    value = newValue;
+                    dap.notify(newValue);
+                },
             })
         });
-        console.log(data);
     }
     compile(el) {
         let element = document.querySelector(el);
@@ -43,9 +49,12 @@ class Mvue {
                 let reg = /\{\{\s*(\S*)\s*\}\}/;
                 if (reg.test(item.textContent)) {
                     // console.log(RegExp.$1);
-
                     item.textContent = this._data[RegExp.$1];
+                    new Watcher(this, RegExp.$1, newValue => {
+                        item.textContent = newValue;
+                    });
                 }
+
             } else if (nodeType === 1) {
                 // 标签
             }
@@ -54,5 +63,33 @@ class Mvue {
                 this.compileNode(item);
             }
         })
+    }
+}
+// 发布者
+class Dap {
+    constructor() {
+        this.items = [];
+    }
+    addSub(watcher) {
+        console.log('添加这个观察者', watcher);
+        this.items.push(watcher);
+    }
+    notify(data) {
+        console.log(this.items);
+        this.items.forEach(item => {
+            item.update(data);
+        })
+    }
+}
+// 订阅者
+class Watcher {
+    constructor(view, vm, callBack) {
+        Dap.target = this;
+        view._data[vm];
+        this.callBack = callBack;
+        Dap.target = null;
+    }
+    update(newValue) {
+        this.callBack(newValue);
     }
 }
