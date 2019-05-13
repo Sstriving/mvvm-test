@@ -16,7 +16,6 @@ class Mvue {
         keys.forEach(key => {
             let value = data[key];
             let dap = new Dap();
-
             Object.defineProperty(data, key, {
                 enumerable: true,
                 configurable: true,
@@ -44,19 +43,47 @@ class Mvue {
         // console.log(childNodes);
         Array.from(childNodes).forEach(item => {
             let { nodeType } = item;
+            
+            // 文本
             if (nodeType === 3) {
-                // 文本
-                let reg = /\{\{\s*(\S*)\s*\}\}/;
+                let reg = /\{\{\s*(\S*)\s*\}\}/; // 匹配文本中的变量 例：{{message}}
                 if (reg.test(item.textContent)) {
-                    // console.log(RegExp.$1);
+                    // 使用类中的变量，去替换节点中的字符串
                     item.textContent = this._data[RegExp.$1];
+
+                    // 新建一个观察者，去监听 数据的变化，动态改变dom文本
                     new Watcher(this, RegExp.$1, newValue => {
                         item.textContent = newValue;
                     });
                 }
+            }
 
-            } else if (nodeType === 1) {
-                // 标签
+            // 标签
+            if (nodeType === 1) {
+                const attrs = item.attributes; // 取标签的所有属性
+                // 因为是类数组，所以需要转化
+
+                Array.from(attrs).forEach(attr=> {
+                    let attrName = attr.name;
+                    let attrValue = attr.value;
+                    if(attrName.indexOf('k-') === 0 ) {
+                        attrName = attrName.substr(2);
+                        // 给显示的文本赋值  这块可以添加其他自定义属性
+                        if(attrName === 'modal') {
+                            item.value = this._data[attrValue];
+                        }
+                    }
+                    // 监听输入，通过view 修改 modal层。
+                    item.addEventListener('input',e => {
+                        this._data[attrValue] = e.target.value;
+                    })
+                    // 监听modal的数据改变，显示到view
+                    new Watcher(this, attrValue, newValue => {
+                        item.value = newValue;
+                      });
+                })
+                console.log(item.attributes);
+
             }
             // 递归节点中还有子节点
             if (item.childNodes.length > 0) {
@@ -70,10 +97,12 @@ class Dap {
     constructor() {
         this.items = [];
     }
+    // 添加观察者
     addSub(watcher) {
         console.log('添加这个观察者', watcher);
         this.items.push(watcher);
     }
+    // 发布者去通知所有订阅者
     notify(data) {
         console.log(this.items);
         this.items.forEach(item => {
@@ -89,6 +118,7 @@ class Watcher {
         this.callBack = callBack;
         Dap.target = null;
     }
+    // 订阅者去更新数据
     update(newValue) {
         this.callBack(newValue);
     }
